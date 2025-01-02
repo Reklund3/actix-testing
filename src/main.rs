@@ -5,7 +5,7 @@ use actix_web::{HttpResponse, web};
 async fn main() {
     println!("Hello, world!");
 
-    let listener = std::net::TcpListener::bind("127.0.0.1:8080").unwrap();
+    let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
     let server = tokio::spawn(
         actix_web::HttpServer::new(|| actix_web::App::new().route("/", web::get().to(home)))
             .listen(listener)
