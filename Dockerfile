@@ -15,7 +15,7 @@ COPY . .
 
 ENV SQLX_OFFLINE true
 
-RUN cargo build --release --bin zero2prod
+RUN cargo build --release --bin actix-testing
 
 FROM debian:bookworm-slim AS runtime
 
@@ -27,18 +27,15 @@ RUN apt-get update -y && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/zero2prod zero2prod
-COPY configuration configuration
-
-ENV APP_ENVIRONMENT production
+COPY --from=builder /app/target/release/actix-testing actix-testing
 
 RUN groupadd -g 1001 appuser && \
     useradd -u 1001 -g 1001 appuser && \
-    chown -R appuser:appuser zero2prod
+    chown -R appuser:appuser actix-testing
 
 USER appuser
 
 # Expose port 8080
 EXPOSE 8080
 
-ENTRYPOINT ["./zero2prod"]
+ENTRYPOINT ["./actix-testing"]
