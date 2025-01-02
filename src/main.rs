@@ -1,5 +1,10 @@
 mod configuration;
 
+use actix_session::config::PersistentSession;
+use actix_session::storage::RedisSessionStore;
+use actix_session::SessionMiddleware;
+use actix_web::cookie::time::Duration;
+use actix_web::cookie::Key;
 use actix_web::http::header::ContentType;
 use actix_web::web::Data;
 use actix_web::{web, HttpResponse};
@@ -11,6 +16,11 @@ async fn main() {
     println!("Hello, world!");
 
     let config = configuration::get_configuration().unwrap();
+    let redis_store = match RedisSessionStore::new(config.clone().redis_uri).await {
+        Ok(store) => store,
+        Err(e) => panic!("Error creating Redis session store: {}", e),
+    };
+    let secret_key = Key::from(config.application.hmac_secret.as_bytes());
 
     let listener = std::net::TcpListener::bind(format!(
         "{}:{}",
@@ -20,6 +30,18 @@ async fn main() {
     let server = tokio::spawn(
         actix_web::HttpServer::new(move || {
             actix_web::App::new()
+                .wrap(
+                    SessionMiddleware::builder(redis_store.clone(), secret_key.clone())
+                        .session_lifecycle(
+                            PersistentSession::default().session_ttl(Duration::seconds(3600)),
+                        )
+                        .cookie_name("zero2prod".to_string())
+                        .cookie_secure(
+                            std::env::var("COOKIE_SECURE").unwrap_or("false".to_owned()) == "true",
+                        )
+                        .cookie_path("/".to_string())
+                        .build(),
+                )
                 .route("/", web::get().to(home))
                 .route("/redis", web::get().to(test_redis))
                 .app_data(web::Data::new(config.clone()))

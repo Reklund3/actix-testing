@@ -1,4 +1,5 @@
 application:
   port: 8080
   host: 0.0.0.0
+  hmac_secret: "asljkdhflkjansdv892398h2uin3f9w8newf980cwne9uvnw980evcnsw908nv9u"
 redis_uri: "redis://redis:6379"
