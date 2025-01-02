@@ -1,19 +1,35 @@
+mod configuration;
+
 use actix_web::http::header::ContentType;
+use actix_web::web::Data;
 use actix_web::{web, HttpResponse};
+use configuration::Settings;
+use redis::{Client, Commands};
 
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
 
-    let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
+    let config = configuration::get_configuration().unwrap();
+
+    let listener = std::net::TcpListener::bind(format!(
+        "{}:{}",
+        config.application.host, config.application.port
+    ))
+    .unwrap();
     let server = tokio::spawn(
-        actix_web::HttpServer::new(|| actix_web::App::new().route("/", web::get().to(home)))
-            .listen(listener)
-            .map_err(|e| {
-                println!("Error: {}", e);
-            })
-            .unwrap()
-            .run(),
+        actix_web::HttpServer::new(move || {
+            actix_web::App::new()
+                .route("/", web::get().to(home))
+                .route("/redis", web::get().to(test_redis))
+                .app_data(web::Data::new(config.clone()))
+        })
+        .listen(listener)
+        .map_err(|e| {
+            println!("Error: {}", e);
+        })
+        .unwrap()
+        .run(),
     );
 
     tokio::select! {
@@ -39,4 +55,25 @@ pub async fn home() -> HttpResponse {
 </html>"#
             .to_string(),
     )
+}
+
+async fn test_redis(config: Data<Settings>) -> HttpResponse {
+    match test_redis_connection(config) {
+        Ok(_) => HttpResponse::Ok().body("Redis connection successful!"),
+        Err(e) => HttpResponse::InternalServerError().body(e),
+    }
+}
+
+fn test_redis_connection(config: Data<Settings>) -> Result<(), String> {
+    match Client::open(config.redis_uri.as_str()) {
+        Ok(client) => match client.get_connection() {
+            Ok(mut connection) => {
+                connection.set::<&str, &str, ()>("test", "test").unwrap();
+                connection.get::<&str, String>("test").unwrap();
+                Ok(())
+            }
+            Err(e) => Err(format!("Error creating Redis connection: {}", e)),
+        },
+        Err(e) => Err(format!("Error creating Redis client: {}", e)),
+    }
 }

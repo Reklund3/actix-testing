@@ -28,6 +28,9 @@ RUN apt-get update -y && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/actix-testing actix-testing
+COPY configuration configuration
+
+ENV APP_ENVIRONMENT production
 
 RUN groupadd -g 1001 appuser && \
     useradd -u 1001 -g 1001 appuser && \
