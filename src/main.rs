@@ -1,5 +1,7 @@
 mod configuration;
+mod session_state;
 
+use crate::session_state::TypedSession;
 use actix_session::config::PersistentSession;
 use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
@@ -35,7 +37,7 @@ async fn main() {
                         .session_lifecycle(
                             PersistentSession::default().session_ttl(Duration::seconds(3600)),
                         )
-                        .cookie_name("zero2prod".to_string())
+                        .cookie_name("actix-testing".to_string())
                         .cookie_secure(
                             std::env::var("COOKIE_SECURE").unwrap_or("false".to_owned()) == "true",
                         )
@@ -44,6 +46,7 @@ async fn main() {
                 )
                 .route("/", web::get().to(home))
                 .route("/redis", web::get().to(test_redis))
+                .route("/session", web::get().to(session))
                 .app_data(web::Data::new(config.clone()))
         })
         .listen(listener)
@@ -97,5 +100,18 @@ fn test_redis_connection(config: Data<Settings>) -> Result<(), String> {
             Err(e) => Err(format!("Error creating Redis connection: {}", e)),
         },
         Err(e) => Err(format!("Error creating Redis client: {}", e)),
+    }
+}
+
+async fn session(session: TypedSession) -> HttpResponse {
+    match session.get_user_id() {
+        Ok(maybe) => match maybe {
+            Some(user_id) => HttpResponse::Ok().body(format!("User ID: {}", user_id)),
+            None => HttpResponse::Ok().body("No user ID found in session"),
+        },
+        Err(e) => HttpResponse::Ok().body(format!(
+            "Failed to get session due to error: {}",
+            e.to_string().replace("\n", "")
+        )),
     }
 }
